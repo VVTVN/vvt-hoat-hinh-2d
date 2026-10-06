@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+episodes/*/out/
+episodes/*/cache/
+*.mp4
+*.wav
+*.mp3
+.env

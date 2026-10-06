@@ -1,0 +1,6 @@
+pillow
+numpy
+korvatts        # giọng thanh_phong (máy Đại Ca đã có ở F:\AI_WORK\KORVATTS)
+edge-tts        # giọng dự phòng free (NamMinh / HoaiMy)
+google-genai    # tuỳ chọn: tự tạo ảnh bằng Gemini API
+# cần thêm ffmpeg trong PATH
