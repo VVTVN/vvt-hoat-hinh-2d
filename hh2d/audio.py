@@ -62,6 +62,13 @@ def _to_wav(src, dst):
                     "-sample_fmt", "s16", dst], check=True)
 
 
+GIONG_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "giong")
+
+
+def voice_key(name, voice, text):
+    return hashlib.sha1(f"{name}|{sorted(voice.items())}|{clean_text(text)}".encode()).hexdigest()[:16]
+
+
 def synth(text, cache_dir, voice=None, engine=None):
     """Tạo giọng (có cache). Trả về (đường_dẫn_wav, tên_engine)."""
     voice = voice or {}
@@ -71,9 +78,13 @@ def synth(text, cache_dir, voice=None, engine=None):
     os.makedirs(cache_dir, exist_ok=True)
     errors = []
     for name in order:
-        key = hashlib.sha1(f"{name}|{sorted(voice.items())}|{text}".encode()).hexdigest()[:16]
+        key = voice_key(name, voice, text)
         final = os.path.join(cache_dir, f"{name}_{key}.wav")
         if os.path.exists(final):
+            return final, name
+        shared = os.path.join(GIONG_DIR, f"{name}_{key}.flac")   # giọng làm sẵn trên máy khác, có trong repo
+        if os.path.exists(shared):
+            _to_wav(shared, final)
             return final, name
         raw = final + ".raw.wav"
         try:

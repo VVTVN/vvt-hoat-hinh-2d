@@ -16,6 +16,11 @@ pip install -r requirements.txt
 Giọng đọc tự chọn theo thứ tự: **KorvaTTS `thanh_phong`** (giống repo vvt-tin-tuc, máy Đại Ca đã có ở `F:\AI_WORK\KORVATTS`, tool tự nhận) → **edge-tts** (free, cần mạng) → **espeak-ng** (robot, chỉ để test).
 Ép engine: thêm `--tts korva` / `--tts edge`.
 
+### Giọng làm sẵn trên máy khác (`giong/`)
+
+Máy nào không chạy được KorvaTTS (vd Claude trên cloud) vẫn dùng được giọng thật: máy có KorvaTTS chạy
+`python -m hh2d.voice --all` rồi commit + push thư mục `giong/` (file .flac). Khi dựng, tool tự lấy giọng trong `giong/` trước.
+
 ## Dựng video
 
 ```bash
