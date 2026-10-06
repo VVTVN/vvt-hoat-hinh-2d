@@ -19,6 +19,23 @@ def clean_text(s):
     return re.sub(r"\s+", " ", s.replace("*", "")).strip()
 
 
+def _korva_from_repo():
+    """Máy không tải được model từ HuggingFace: dùng repo korva-assets cạnh repo này (đã cắt nhỏ)."""
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    packed = os.path.join(root, "korva-assets")
+    if not os.path.isdir(os.path.join(packed, "assets")):
+        return ""
+    out = os.path.join(os.path.expanduser("~"), ".cache", "hh2d", "korva")
+    if not os.path.exists(os.path.join(out, "onnx", "vocoder.onnx")):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "lap_korva", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "tools", "lap_korva.py"))
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        m.lap(packed, out)
+    return out
+
+
 def _korva_exe():
     exe = os.environ.get("KORVATTS_EXE") or (KORVA_LOCAL_EXE if os.path.exists(KORVA_LOCAL_EXE) else "korvatts")
     return exe if (os.path.exists(exe) or shutil.which(exe)) else None
@@ -28,7 +45,8 @@ def _tts_korva(text, out, voice):
     exe = _korva_exe()
     if not exe:
         raise RuntimeError("không thấy korvatts")
-    assets = os.environ.get("KORVATTS_ASSETS") or (KORVA_LOCAL_ASSETS if os.path.exists(KORVA_LOCAL_ASSETS) else "")
+    assets = os.environ.get("KORVATTS_ASSETS") or (KORVA_LOCAL_ASSETS if os.path.exists(KORVA_LOCAL_ASSETS) else "") \
+        or _korva_from_repo()
     cmd = [exe, "synth"] + (["--assets-dir", assets] if assets else []) + [
         "-v", voice.get("voice", "thanh_phong"), "-l", "vi", "--speed", str(voice.get("speed", 1.4)),
         "--steps", str(voice.get("steps", 32)), "-o", out, text]
