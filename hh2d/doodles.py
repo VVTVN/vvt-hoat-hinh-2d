@@ -221,13 +221,13 @@ def hanh_tinh(p, st, color=(170, 120, 200), ring=(240, 200, 120), **_):
 
 
 @doodle(300, 300)
-def mat_troi(p, st, **_):
+def mat_troi(p, st, color=(255, 210, 70), ray=(255, 190, 60), **_):
     t = st["t"]
     for i in range(12):
         a = i * math.pi / 6 + t * .6
         r0, r1 = 92, 130 + 10 * math.sin(t * 6 + i)
-        p.line([(r0 * math.cos(a), r0 * math.sin(a)), (r1 * math.cos(a), r1 * math.sin(a))], (255, 190, 60), 9)
-    p.circle(0, 0, 80, fill=(255, 210, 70), w=6)
+        p.line([(r0 * math.cos(a), r0 * math.sin(a)), (r1 * math.cos(a), r1 * math.sin(a))], ray, 9)
+    p.circle(0, 0, 80, fill=color, w=6)
     p.dot(-25, -10, 7)
     p.dot(25, -10, 7)
     p.line(arc_pts(0, 8, 28, .4, math.pi - .4), INK, 5, amp=.3)
@@ -367,3 +367,108 @@ def may(p, st, **_):
     p.line(arc_pts(0, -15, 70, math.pi * 1.1, math.pi * 1.9), INK, 5)
     p.line(arc_pts(65, 15, 55, -math.pi * .45, math.pi * .45), INK, 5)
     p.line([(-80, 68), (85, 68)], INK, 5)
+
+
+# ---------------------------------------------------------------- ánh sáng / vật lý
+def _beam_box(kw):
+    return kw.get("length", 800) + 120, kw.get("width", 26) * 3 + 120
+
+
+@doodle(_beam_box, None)
+def tia_sang(p, st, length=800, color=(255, 248, 215), width=26, grow=1.0, wave=True, **_):
+    """Tia sáng chạy từ trái sang phải (mọc dần trong `grow` giây), có quầng sáng. flip=True: phải sang trái."""
+    t = st["t"]
+    k = min(1.0, st["age"] / grow) if grow else 1.0
+    if k <= 0:
+        return
+    x0, x1 = -length / 2, -length / 2 + length * k
+    n = max(2, int((x1 - x0) / 10))
+    pts = [(x0 + (x1 - x0) * i / n, (6 * math.sin((x0 + (x1 - x0) * i / n) / 40 - t * 9) if wave else 0))
+           for i in range(n + 1)]
+    glow = Image.new("RGBA", p.img.size, tuple(color) + (0,))
+    ImageDraw.Draw(glow).line([p.P(*q) for q in pts], fill=tuple(color) + (150,), width=p.W(width * 2.2), joint="curve")
+    p.img.alpha_composite(glow.filter(ImageFilter.GaussianBlur(p.W(width * .7))))
+    p.d.line([p.P(*q) for q in pts], fill=tuple(color) + (255,), width=p.W(width), joint="curve")
+    hx, hy = pts[-1]
+    p.dot(hx, hy, width * .9, tuple(color) + (255,))
+
+
+@doodle(320, 300)
+def lang_kinh(p, st, **_):
+    """Lăng kính tam giác trong suốt."""
+    tri = [(0, -120), (125, 105), (-125, 105)]
+    p.poly(tri, fill=(185, 225, 255, 170), w=6)
+    p.line([(-40, -20), (-75, 50)], (255, 255, 255, 230), 6, amp=.5)
+
+
+RAINBOW = [(235, 60, 60), (250, 140, 50), (250, 220, 60), (90, 200, 90), (70, 170, 240), (60, 90, 220), (150, 80, 210)]
+
+
+def _fan_box(kw):
+    L, sp = kw.get("length", 700), kw.get("spread", .45)
+    return L * 2 + 60, 2 * L * math.sin(sp) + 80
+
+
+@doodle(_fan_box, None)
+def cau_vong(p, st, length=700, spread=.45, grow=1.0, **_):
+    """Chùm 7 màu toả ra từ tâm sang phải (sau lăng kính)."""
+    k = min(1.0, st["age"] / grow) if grow else 1.0
+    if k <= 0:
+        return
+    for i, c in enumerate(RAINBOW):
+        a = -spread / 2 + spread * i / 6
+        L = length * k
+        p.line([(0, 0), (L * math.cos(a), L * math.sin(a))], c, 14, amp=1)
+
+
+def _wave_box(kw):
+    return kw.get("length", 900) + 100, kw.get("amp", 60) * 2 + 100
+
+
+@doodle(_wave_box, None)
+def song(p, st, length=900, wavelength=200, amp=60, color=(235, 60, 60), speed=1.0, **_):
+    """Sóng ánh sáng chạy sang phải. wavelength: bước sóng (px)."""
+    t = st["t"]
+    n = int(length / 6)
+    pts = [(-length / 2 + length * i / n,
+            amp * math.sin(2 * math.pi * (length * i / n / wavelength - t * speed))) for i in range(n + 1)]
+    p.line(pts, color, 9, amp=.8)
+    x1, y1 = pts[-1]
+    p.line([(x1 - 30, y1 - 22), (x1 + 4, y1), (x1 - 30, y1 + 22)], color, 9, amp=.4)
+
+
+@doodle(170, 120)
+def phan_tu(p, st, color=(175, 205, 255), **_):
+    """Phân tử khí (N2) dễ thương."""
+    p.circle(-26, 0, 36, fill=color, w=5)
+    p.circle(26, 0, 36, fill=color, w=5)
+    blink = st.get("blink")
+    for ex in (-12, 12):
+        if blink:
+            p.line([(ex - 5, -5), (ex + 5, -5)], INK, 3, amp=.2)
+        else:
+            p.dot(ex, -5, 4.5)
+    p.line(arc_pts(0, 3, 9, .5, math.pi - .5), INK, 3, amp=.2)
+
+
+def _scatter_box(kw):
+    r = kw.get("reach", 170) + 90
+    return 2 * r, 2 * r
+
+
+@doodle(_scatter_box, None)
+def tan_xa(p, st, color=(70, 150, 255), n=8, reach=170, seed=0.0, **_):
+    """Những sóng nhỏ bắn ra mọi hướng (tán xạ)."""
+    t = st["t"]
+    for i in range(n):
+        a = 2 * math.pi * i / n + seed
+        k = (t * 1.1 + i * .37 + seed) % 1
+        r = 40 + reach * k
+        ca, sa = math.cos(a), math.sin(a)
+        pts = []
+        for j in range(9):
+            u = j * 7
+            off = 7 * math.sin(j * 1.4)
+            pts.append(((r + u) * ca - off * sa, (r + u) * sa + off * ca))
+        w = 7 if k < .75 else max(1, int(7 * (1 - k) / .25))
+        p.line(pts, color, w, amp=.3)

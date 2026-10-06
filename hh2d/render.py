@@ -51,7 +51,24 @@ def _bg_troi(seed=7):
     return img
 
 
-BACKGROUNDS = {"vu_tru": _bg_vu_tru, "giay": _bg_giay, "troi": _bg_troi}
+def _bg_hoang_hon(seed=7):
+    rng = random.Random(seed)
+    a = np.linspace(0, 1, WORLD_H)[:, None]
+    stops = [(0, (70, 55, 130)), (.45, (230, 110, 100)), (.75, (255, 170, 90)), (1, (255, 200, 120))]
+    arr = np.zeros((WORLD_H, 3))
+    for (p0, c0), (p1, c1) in zip(stops, stops[1:]):
+        m = ((a >= p0) & (a <= p1))[:, 0]
+        k = ((a[m] - p0) / (p1 - p0))
+        arr[m] = np.array(c0) * (1 - k) + np.array(c1) * k
+    img = Image.fromarray((arr[:, None, :] * np.ones((1, WORLD_W, 1))).astype(np.uint8))
+    p = Pen(img, rng, 1, 0, 0)
+    p.hatch((0, 0, WORLD_W, 820), (255, 255, 255), n=300, angle=-.6, length=44, w=1)
+    hills = [(-20, 900), (300, 820), (700, 880), (1150, 800), (1600, 870), (1940, 830), (1940, 1100), (-20, 1100)]
+    p.poly(hills, fill=(70, 45, 80), w=6)
+    return img
+
+
+BACKGROUNDS = {"vu_tru": _bg_vu_tru, "giay": _bg_giay, "troi": _bg_troi, "hoang_hon": _bg_hoang_hon}
 
 
 def _cover(img, w, h):
@@ -125,8 +142,12 @@ def fx_front(img, name, kw, t, rng):
 def parse_words(say):
     words = []
     for i, part in enumerate(re.split(r"\*", say)):
-        for w in part.split():
-            words.append((w, i % 2 == 1))
+        for k, w in enumerate(part.split()):
+            # dấu câu đứng ngay sau *từ khoá* thì dính vào từ trước, không cách
+            if k == 0 and words and not part[:1].isspace() and re.fullmatch(r"[,.!?…:;]+", w):
+                words[-1] = (words[-1][0] + "\x00" + w, words[-1][1])
+            else:
+                words.append((w, i % 2 == 1))
     return words
 
 
@@ -151,13 +172,17 @@ def draw_caption(img, words, age, H):
     f = font(size)
     d = ImageDraw.Draw(img)
     space = f.getlength(" ")
-    widths = [f.getlength(w) for w, _ in words]
+    words = [tuple(w.split("\x00")) + ((hl,) if "\x00" in w else ("", hl)) for w, hl in words]
+    widths = [f.getlength(w + tail) for w, tail, _ in words]
     total = sum(widths) + space * (len(words) - 1)
     x = (img.width - total) / 2
     y = img.height - 95 * H / 1080
     sw = max(2, int(size / 9))
-    for (w, hl), wd in zip(words, widths):
+    for (w, tail, hl), wd in zip(words, widths):
         d.text((x, y), w, font=f, fill=YELLOW if hl else (255, 255, 255), stroke_width=sw, stroke_fill=INK, anchor="ls")
+        if tail:
+            d.text((x + f.getlength(w), y), tail, font=f, fill=(255, 255, 255), stroke_width=sw, stroke_fill=INK,
+                   anchor="ls")
         x += wd + space
 
 
@@ -219,7 +244,8 @@ class Renderer:
             return
         boil = (frame // 4) % 3
         rng = random.Random(si * 1000 + idx * 10 + boil)
-        st = dict(t=t, talk=talk if a.talk else 0.0, blink=((t + phase * 1.7) % 3.4) < .12)
+        st = dict(t=t, age=t - (a.enter_at if a.enter else 0.0), talk=talk if a.talk else 0.0,
+                  blink=((t + phase * 1.7) % 3.4) < .12)
         lay = self.sprite(a, st, s["scale"], rng)
         rot = s["rot"]
         if a.boil and a.what not in DOODLES:
