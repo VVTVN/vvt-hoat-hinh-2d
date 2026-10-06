@@ -123,6 +123,8 @@ class Scene:
     transition: str = "whip"
     captions: bool = True
     sfx: list = field(default_factory=list)   # [(giây, "pop"|"whoosh"|"ding"|"boom"), ...]
+    short_x: float | None = None   # tâm khung khi xuất Short dọc (mặc định: giữa các vật)
+    outro: bool = False            # cảnh kết (Đăng ký kênh): bỏ khi gom vào video dài
 
 
 # ---------------------------------------------------------------- actor animation

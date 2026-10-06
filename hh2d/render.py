@@ -6,7 +6,7 @@ import random
 import re
 
 import numpy as np
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from .doodles import DOODLES
 from .draw import INK, YELLOW, Pen, font
@@ -166,17 +166,21 @@ def chunk_words(words, max_words=7):
     return chunks
 
 
-def draw_caption(img, words, age, H):
+def draw_caption(img, words, age, size, y, maxw=None):
     k = .8 + .2 * ease_out_back(age / .18)
-    size = 66 * H / 1080 * k
-    f = font(size)
-    d = ImageDraw.Draw(img)
-    space = f.getlength(" ")
     words = [tuple(w.split("\x00")) + ((hl,) if "\x00" in w else ("", hl)) for w, hl in words]
-    widths = [f.getlength(w + tail) for w, tail, _ in words]
-    total = sum(widths) + space * (len(words) - 1)
+    maxw = maxw or img.width * .92
+    size *= k
+    while True:
+        f = font(size)
+        space = f.getlength(" ")
+        widths = [f.getlength(w + tail) for w, tail, _ in words]
+        total = sum(widths) + space * (len(words) - 1)
+        if total <= maxw or size < 20:
+            break
+        size *= .93
+    d = ImageDraw.Draw(img)
     x = (img.width - total) / 2
-    y = img.height - 95 * H / 1080
     sw = max(2, int(size / 9))
     for (w, tail, hl), wd in zip(words, widths):
         d.text((x, y), w, font=f, fill=YELLOW if hl else (255, 255, 255), stroke_width=sw, stroke_fill=INK, anchor="ls")
@@ -188,10 +192,18 @@ def draw_caption(img, words, age, H):
 
 # ---------------------------------------------------------------- renderer
 class Renderer:
-    def __init__(self, ep_dir, scenes, timing, talk, captions, W=1920, H=1080, fps=30):
+    def __init__(self, ep_dir, scenes, timing, talk, captions, W=1920, H=1080, fps=30, short=False, title=""):
         self.ep_dir, self.scenes, self.timing = ep_dir, scenes, timing
         self.talk, self.captions = talk, captions
         self.W, self.H, self.fps = W, H, fps
+        self.short, self.title = short, title
+        if short:   # khung dọc: tiêu đề trên, khung phim giữa, phụ đề dưới
+            u = W / 1080
+            self.PW, self.PH = W, int(1000 * u)
+            self.panel_y = int(430 * u)
+            self.short_x = [self._short_focus(sc) for sc in scenes]
+        else:
+            self.PW, self.PH = W, H
         self.starts = [s for s, _ in timing]
         self.total = timing[-1][0] + timing[-1][1]
         self._bg, self._img = {}, {}
@@ -199,6 +211,15 @@ class Renderer:
         g = rng.normal(0, 1, (H // 2, W // 2))
         grain = Image.fromarray(np.uint8(np.clip(244 + g * 6, 0, 255))).resize((W, H), Image.BILINEAR)
         self.grain = Image.merge("RGB", [grain] * 3)
+
+    @staticmethod
+    def _short_focus(sc):
+        """Tâm khung dọc: short_x của cảnh, không thì giữa các vật nằm trong màn hình."""
+        if sc.short_x is not None:
+            return sc.short_x
+        xs = [a.path[-1][1] if a.path else a.x for a in sc.actors]
+        xs = [x for x in xs if 0 <= x <= WORLD_W]
+        return (min(xs) + max(xs)) / 2 if xs else WORLD_W / 2
 
     # -- tài nguyên
     def _path(self, what):
@@ -285,21 +306,25 @@ class Renderer:
             if 0 <= dt < .5:
                 z *= 1 + .12 * ease_out_cubic(dt / .08) * (1 - dt / .5) ** 2
         fx_, fy_ = cam.focus or (WORLD_W / 2, WORLD_H / 2)
+        if self.short:
+            fx_ = self.short_x[si]
         (px0, py0), (px1, py1) = cam.pan
         cx = fx_ + px0 + (px1 - px0) * p
         cy = fy_ + py0 + (py1 - py0) * p
-        cw, ch = WORLD_W / z, WORLD_H / z
+        ch = WORLD_H / z
+        cw = min(WORLD_W, ch * self.PW / self.PH) if self.short else WORLD_W / z
         for ts, sd, amp in cam.shake:
             dt = t - ts
             if 0 <= dt < sd:
                 k = amp * (1 - dt / sd)
                 cx += k * math.sin(dt * 53)
                 cy += k * math.sin(dt * 47 + 1)
-        cx = min(max(cx, cw / 2), WORLD_W - cw / 2) if z >= 1 else WORLD_W / 2
+        cx = min(max(cx, cw / 2), WORLD_W - cw / 2) if (z >= 1 or self.short) else WORLD_W / 2
         cy = min(max(cy, ch / 2), WORLD_H - ch / 2) if z >= 1 else WORLD_H / 2
         box = (cx - cw / 2, cy - ch / 2, cx + cw / 2, cy + ch / 2)
-        out = world.resize((self.W, self.H), Image.BICUBIC, box=box)
-        out = ImageChops.multiply(out, self.grain)
+        out = world.resize((self.PW, self.PH), Image.BICUBIC, box=box)
+        if not self.short:
+            out = ImageChops.multiply(out, self.grain)
         for name, kw in fxs:
             if name == "flash":
                 dt = t - kw.get("t", 0)
@@ -321,16 +346,16 @@ class Renderer:
                 img = Image.blend(prev, img, p)
             elif kind == "zoom":
                 z = 1 + .6 * p
-                w, h = self.W / z, self.H / z
-                prev = prev.resize((self.W, self.H), Image.BILINEAR,
-                                   box=((self.W - w) / 2, (self.H - h) / 2, (self.W + w) / 2, (self.H + h) / 2))
+                w, h = self.PW / z, self.PH / z
+                prev = prev.resize((self.PW, self.PH), Image.BILINEAR,
+                                   box=((self.PW - w) / 2, (self.PH - h) / 2, (self.PW + w) / 2, (self.PH + h) / 2))
                 img = Image.blend(prev, img, p)
             else:  # whip
-                both = Image.new("RGB", (self.W * 2, self.H))
+                both = Image.new("RGB", (self.PW * 2, self.PH))
                 both.paste(prev, (0, 0))
-                both.paste(img, (self.W, 0))
-                off = int(p * self.W)
-                arr = np.asarray(both.crop((off, 0, off + self.W, self.H)), np.float32)
+                both.paste(img, (self.PW, 0))
+                off = int(p * self.PW)
+                arr = np.asarray(both.crop((off, 0, off + self.PW, self.PH)), np.float32)
                 blur = int(70 * math.sin(p * math.pi))
                 if blur > 2:
                     acc = np.zeros_like(arr)
@@ -339,8 +364,41 @@ class Renderer:
                         acc += np.roll(arr, k, axis=1)
                     arr = acc / len(ks)
                 img = Image.fromarray(arr.astype(np.uint8))
+        if self.short:
+            img = self.compose_short(img, T)
+            cap_size, cap_y = 84 * self.W / 1080, self.panel_y + self.PH + 200 * self.W / 1080
+        else:
+            cap_size, cap_y = 66 * self.H / 1080, self.H - 95 * self.H / 1080
         for c0, c1, words in self.captions:
             if c0 <= T < c1:
-                draw_caption(img, words, T - c0, self.H)
+                draw_caption(img, words, T - c0, cap_size, cap_y)
                 break
         return img.tobytes()
+
+    def compose_short(self, panel, T):
+        W, H, u = self.W, self.H, self.W / 1080
+        back = _cover(panel.resize((self.PW // 6, self.PH // 6)), 180, 320).filter(ImageFilter.GaussianBlur(8))
+        back = back.resize((W, H), Image.BILINEAR).point(lambda v: int(v * .45))
+        back.paste(panel, (0, self.panel_y))
+        d = ImageDraw.Draw(back)
+        d.rectangle([-2, self.panel_y - int(6 * u), W + 2, self.panel_y + self.PH + int(6 * u)],
+                    outline=(250, 250, 246), width=int(8 * u))
+        # tiêu đề
+        if self.title:
+            size = 96 * u
+            f = font(size)
+            words, lines, cur = self.title.split(), [], ""
+            for w in words:
+                trial = (cur + " " + w).strip()
+                if f.getlength(trial) > W * .88 and cur:
+                    lines.append(cur)
+                    cur = w
+                else:
+                    cur = trial
+            lines.append(cur)
+            lh = size * 1.18
+            y = self.panel_y / 2 - lh * (len(lines) - 1) / 2 + 8 * u * math.sin(T * 2.2)
+            for k, ln in enumerate(lines):
+                d.text((W / 2, y + k * lh), ln, font=f, fill=YELLOW, stroke_width=int(size / 10), stroke_fill=INK,
+                       anchor="mm")
+        return ImageChops.multiply(back, self.grain)

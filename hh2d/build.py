@@ -102,7 +102,8 @@ def plan(ep_dir, scenes, fps, voice, engine):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("episode")
-    ap.add_argument("--res", default="1920x1080")
+    ap.add_argument("--res", default=None, help="mặc định 1920x1080, Short 1080x1920")
+    ap.add_argument("--short", action="store_true", help="xuất Short dọc 9:16")
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 1))
     ap.add_argument("--tts", default=None, help="korva | edge | espeak")
@@ -118,7 +119,7 @@ def main():
     if args.scenes:
         a, _, b = args.scenes.partition("-")
         scenes = scenes[int(a) - 1:int(b or a)]
-    W, H = map(int, args.res.lower().split("x"))
+    W, H = map(int, (args.res or ("1080x1920" if args.short else "1920x1080")).lower().split("x"))
     fps = args.fps
     print(f"Tập: {getattr(ep, 'TITLE', os.path.basename(ep_dir))} | {len(scenes)} cảnh | {W}x{H}@{fps}", flush=True)
 
@@ -126,15 +127,16 @@ def main():
         ep_dir, scenes, fps, getattr(ep, "VOICE", {}), args.tts)
     out_dir = os.path.join(ep_dir, "out")
     os.makedirs(out_dir, exist_ok=True)
-    rargs = (scenes, timing, talk, captions, W, H, fps)
+    rargs = (scenes, timing, talk, captions, W, H, fps, args.short, getattr(ep, "TITLE", ""))
 
     if args.still:
         r = Renderer(ep_dir, *rargs)
         for s in args.still:
             i = int(s * fps)
             from PIL import Image
-            Image.frombytes("RGB", (W, H), r.frame(i)).save(os.path.join(out_dir, f"still_{s:g}.png"))
-            print("  ảnh:", os.path.join(out_dir, f"still_{s:g}.png"))
+            fn = os.path.join(out_dir, f"still_{s:g}{'_short' if args.short else ''}.png")
+            Image.frombytes("RGB", (W, H), r.frame(i)).save(fn)
+            print("  ảnh:", fn)
         return
 
     # âm thanh: giọng + hiệu ứng + nhạc nền (tự hạ khi có giọng)
@@ -151,7 +153,8 @@ def main():
     wav = os.path.join(out_dir, "audio.wav")
     audio.write_wav(wav, mix[:int(total * audio.SR)])
 
-    name = args.out or (os.path.basename(ep_dir) + ("" if not args.scenes else f"_canh{args.scenes}") + ".mp4")
+    name = args.out or (os.path.basename(ep_dir) + ("" if not args.scenes else f"_canh{args.scenes}")
+                        + ("_short" if args.short else "") + ".mp4")
     out = os.path.join(out_dir, name)
     n = int(round(total * fps))
     ff = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgb24",

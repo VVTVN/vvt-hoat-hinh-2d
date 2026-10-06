@@ -43,6 +43,7 @@ SCENES = [
     # 3. Lăng kính tách màu
     Scene(
         say="nhưng thật ra, nó là hỗn hợp của *bảy màu cầu vồng*.",
+        short_x=1150,
         fx=["twinkle"],
         cam=Cam(zoom=(1.0, 1.1), focus=(960, 500), punch=[1.7]),
         dur=4.0,
@@ -156,6 +157,7 @@ SCENES = [
     # 11. Kết
     Scene(
         say="Giờ thì bạn đã biết rồi đấy! Đăng ký kênh để xem thêm nhé!",
+        outro=True,
         bg="troi",
         fx=[("confetti", dict(seed=5))],
         cam=Cam(zoom=(1.08, 1.0)),

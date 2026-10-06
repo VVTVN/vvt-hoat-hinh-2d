@@ -24,7 +24,15 @@ python -m hh2d.build episodes/trai_dat_ngung_quay --res 1280x720         # xem n
 python -m hh2d.build episodes/trai_dat_ngung_quay --scenes 3-5           # chỉ dựng cảnh 3 đến 5
 python -m hh2d.build episodes/trai_dat_ngung_quay --still 5 12.5         # xuất ảnh tĩnh để soi
 python -m hh2d.build episodes/trai_dat_ngung_quay --music nhac.mp3       # thêm nhạc nền (tự hạ khi có giọng)
+python -m hh2d.build episodes/trai_dat_ngung_quay --short                # Short dọc 9:16 (tiêu đề trên, phụ đề dưới)
+python -m hh2d.build episodes/video_dai_01                               # video dài gom nhiều tập
 ```
+
+## Short + video dài
+
+- Mỗi chủ đề là một tập (~40-60s). Xuất Short bằng `--short`. Cảnh nào bị cắt mất vật khi dọc thì thêm `short_x=...` (tâm khung) cho cảnh đó.
+- Cảnh kết "Đăng ký kênh" đánh dấu `outro=True`: có trong Short, tự bỏ khi gom.
+- Video dài: `episodes/video_dai_01/episode.py`, thêm tên tập vào danh sách `TAP`. Mỗi tập tự có thẻ "Câu hỏi #k" ở đầu, có sẵn cảnh mở đầu và kết. 12-14 tập ≈ 9-11 phút.
 
 Tập mẫu 34 giây (1080p) dựng mất khoảng 1 phút trên máy 4 nhân. Giọng được cache, sửa hình không phải đọc lại.
 

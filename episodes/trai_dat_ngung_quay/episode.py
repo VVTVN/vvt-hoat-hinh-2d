@@ -117,18 +117,30 @@ SCENES = [
                   kw=dict(text="x2", size=180, color=(255, 110, 80))),
         ],
     ),
-    # 8. Kết
+    # 8. Kết luận
     Scene(
-        say="May mắn là chuyện này gần như *không thể* xảy ra. Đăng ký kênh để xem thêm nhé!",
-        fx=["twinkle", ("rays", dict(x=960, y=560, color=(24, 36, 74), speed=.3)), ("confetti", dict(seed=5))],
+        say="May mắn là chuyện này gần như *không thể* xảy ra.",
+        fx=["twinkle", ("rays", dict(x=960, y=560, color=(24, 36, 74), speed=.3))],
         cam=Cam(zoom=(1.08, 1.0)),
-        dur=6.0,
         actors=[
             Actor("trai_dat", 330, 470, enter="pop", idle="float", kw=dict(r=200, spin=.6, face="happy")),
-            Actor("giao_su", 960, 600, enter="rise", talk=True, idle="hop", kw=dict(pose="cheer")),
-            Actor("nut_dang_ky", 1520, 420, enter="pop", enter_at=3.0, idle="pulse"),
-            Actor("sao", 1700, 300, enter="pop", enter_at=3.3, idle="wiggle"),
-            Actor("sao", 1350, 300, enter="pop", enter_at=3.5, idle="wiggle", kw=dict(r=16)),
+            Actor("giao_su", 960, 600, enter="rise", talk=True, idle="breathe", kw=dict(pose="shrug")),
+            Actor("sao", 1500, 300, enter="pop", enter_at=.8, idle="wiggle"),
+        ],
+    ),
+    # 9. Outro (chỉ có ở bản lẻ / Short)
+    Scene(
+        say="Đăng ký kênh để xem thêm nhé!",
+        outro=True,
+        fx=["twinkle", ("rays", dict(x=960, y=560, color=(24, 36, 74), speed=.3)), ("confetti", dict(seed=5))],
+        transition="cut",
+        dur=3.5,
+        actors=[
+            Actor("trai_dat", 330, 470, enter=None, idle="float", kw=dict(r=200, spin=.6, face="happy")),
+            Actor("giao_su", 960, 600, enter=None, talk=True, idle="hop", kw=dict(pose="cheer")),
+            Actor("nut_dang_ky", 1520, 420, enter="pop", enter_at=.3, idle="pulse"),
+            Actor("sao", 1700, 300, enter="pop", enter_at=.6, idle="wiggle"),
+            Actor("sao", 1350, 300, enter="pop", enter_at=.8, idle="wiggle", kw=dict(r=16)),
         ],
     ),
 ]
